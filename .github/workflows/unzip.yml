@@ -10,53 +10,50 @@ jobs:
   unzip-and-route:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Crucial permission to let the workflow create and push branches
+      contents: write
 
     steps:
       - name: Checkout repository
-        uses: [actions/checkout](https://github.com/actions/checkout "Can I check out a new branch? · Issue #1657 · actions/checkout - GitHub")@v4
+        uses: [actions/checkout](https://github.com "Can I check out a new branch? · Issue #1657 · actions/checkout - GitHub")@v4
         with:
-          fetch-depth: 0 # Fetches all historical branch references
+          fetch-depth: 0
 
       - name: Configure Git Bot Identity
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Process main.zip (Routes to main)
-        if: hashFiles('main.zip') != ''
+      - name: Process Files Sequentially
         run: |
-          # 1. Stash the file so it isn't erased when we switch branches
-          mv main.zip ../main.zip
-          
-          # 2. Check if 'main' branch exists, otherwise create it
-          git checkout main || git checkout -b main
-          
-          # 3. Bring the file back, extract, and clean up
-          mv ../main.zip ./main.zip
-          unzip -o main.zip
-          rm main.zip
-          
-          # 4. Commit and Push back to main
-          git add .
-          git commit -m "Automated extraction of main.zip" || echo "No changes to commit"
-          git push origin main
+          # --- HANDLE MAIN.ZIP ---
+          if [ -f main.zip ]; then
+            echo "Found main.zip, routing to main branch..."
+            mv main.zip ../main.zip
+            git checkout main || git checkout -b main
+            mv ../main.zip ./main.zip
+            unzip -o main.zip
+            rm main.zip
+            git add .
+            git commit -m "Automated extraction of main.zip" && git push origin main || echo "No changes for main"
+            # Switch back to the commit branch to look for the next file
+            git checkout ${{ github.ref_name }}
+          fi
 
-      - name: Process beta.zip (Routes to beta)
-        if: hashFiles('beta.zip') != ''
-        run: |
-          # 1. Stash the file so it isn't erased when we switch branches
-          mv beta.zip ../beta.zip
-          
-          # 2. Check if 'beta' branch exists, otherwise create it from the current commit
-          git checkout beta || git checkout -b beta
-          
-          # 3. Bring the file back, extract, and clean up
-          mv ../beta.zip ./beta.zip
-          unzip -o beta.zip
-          rm beta.zip
-          
-          # 4. Commit and Push back to beta
-          git add .
-          git commit -m "Automated extraction of beta.zip" || echo "No changes to commit"
-          git push origin beta
+          # --- HANDLE BETA.ZIP ---
+          if [ -f beta.zip ]; then
+            echo "Found beta.zip, routing to beta branch..."
+            mv beta.zip ../beta.zip
+            
+            # Check if beta exists remotely, if not create it
+            if git show-ref --verify --quiet refs/remotes/origin/beta; then
+              git checkout beta
+            else
+              git checkout -b beta
+            fi
+            
+            mv ../beta.zip ./beta.zip
+            unzip -o beta.zip
+            rm beta.zip
+            git add .
+            git commit -m "Automated extraction of beta.zip" && git push origin beta || echo "No changes for beta"
+          fi
