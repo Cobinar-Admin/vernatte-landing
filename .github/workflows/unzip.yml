@@ -1,30 +1,62 @@
-name: Unzip Web Assets
+name: Cross-Branch Smart Unzipper
 
 on:
   push:
     paths:
-      - 'm.zip' # Triggers only when m.zip is uploaded or modified
+      - 'main.zip'
+      - 'beta.zip'
 
 jobs:
-  unzip-file:
+  unzip-and-route:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Allows the bot to commit unzipped files back to main
+      contents: write # Crucial permission to let the workflow create and push branches
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Extract zip archive
-        run: |
-          # Unzips m.zip directly into the root repository folder
-          unzip -o m.zip
-          # Deletes the original zip file so it doesn't clutter your repo
-          rm m.zip
-
-      - name: Commit and Push changes
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: [actions/checkout](https://github.com/actions/checkout "Can I check out a new branch? · Issue #1657 · actions/checkout - GitHub")@v4
         with:
-          commit_message: "Automated unzip of m.zip assets"
-          branch: main
+          fetch-depth: 0 # Fetches all historical branch references
+
+      - name: Configure Git Bot Identity
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Process main.zip (Routes to main)
+        if: hashFiles('main.zip') != ''
+        run: |
+          # 1. Stash the file so it isn't erased when we switch branches
+          mv main.zip ../main.zip
           
+          # 2. Check if 'main' branch exists, otherwise create it
+          git checkout main || git checkout -b main
+          
+          # 3. Bring the file back, extract, and clean up
+          mv ../main.zip ./main.zip
+          unzip -o main.zip
+          rm main.zip
+          
+          # 4. Commit and Push back to main
+          git add .
+          git commit -m "Automated extraction of main.zip" || echo "No changes to commit"
+          git push origin main
+
+      - name: Process beta.zip (Routes to beta)
+        if: hashFiles('beta.zip') != ''
+        run: |
+          # 1. Stash the file so it isn't erased when we switch branches
+          mv beta.zip ../beta.zip
+          
+          # 2. Check if 'beta' branch exists, otherwise create it from the current commit
+          git checkout beta || git checkout -b beta
+          
+          # 3. Bring the file back, extract, and clean up
+          mv ../beta.zip ./beta.zip
+          unzip -o beta.zip
+          rm beta.zip
+          
+          # 4. Commit and Push back to beta
+          git add .
+          git commit -m "Automated extraction of beta.zip" || echo "No changes to commit"
+          git push origin beta
