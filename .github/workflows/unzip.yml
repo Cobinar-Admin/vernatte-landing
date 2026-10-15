@@ -14,14 +14,14 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: [actions/checkout](https://github.com "Can I check out a new branch? · Issue #1657 · actions/checkout - GitHub")@v4
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Configure Git Bot Identity
         run: |
           git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.email "41898282+github-actions[bot]@://github.com"
 
       - name: Process Files Sequentially
         run: |
@@ -35,7 +35,6 @@ jobs:
             rm main.zip
             git add .
             git commit -m "Automated extraction of main.zip" && git push origin main || echo "No changes for main"
-            # Switch back to the commit branch to look for the next file
             git checkout ${{ github.ref_name }}
           fi
 
@@ -44,7 +43,6 @@ jobs:
             echo "Found beta.zip, routing to beta branch..."
             mv beta.zip ../beta.zip
             
-            # Check if beta exists remotely, if not create it
             if git show-ref --verify --quiet refs/remotes/origin/beta; then
               git checkout beta
             else
